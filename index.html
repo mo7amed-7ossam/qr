@@ -4,12 +4,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ماسح QR باستخدام الكاميرا</title>
+    <title>ماسح QR وباركود باستخدام الكاميرا</title>
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
 </head>
 
 <body>
-    <h2>امسح QR باستخدام الكاميرا</h2>
+    <h2>امسح QR أو باركود باستخدام الكاميرا</h2>
     <video id="video" style="width: 100%; max-width: 400px;" autoplay playsinline></video>
     <canvas id="canvas" style="display: none;"></canvas>
     <p>النتيجة: <span id="result">لم يتم المسح بعد</span></p>
@@ -34,7 +35,10 @@
                 video.srcObject = stream;
                 video.setAttribute("playsinline", true);
                 video.play();
+
+                // بدء مسح QR وباركود
                 requestAnimationFrame(scanQRCode);
+                startBarcodeScanner();
             } catch (err) {
                 console.error("⚠️ خطأ في تشغيل الكاميرا:", err);
                 resultElement.innerText = "⚠️ لا يمكن تشغيل الكاميرا!";
@@ -54,16 +58,50 @@
 
                 if (code && code.data.trim().length > 0) {
                     scanning = false;
-                    resultElement.innerText = `✅ تم المسح: ${code.data}`;
+                    resultElement.innerText = `✅ تم المسح (QR): ${code.data}`;
 
                     // إيقاف تشغيل الكاميرا بعد المسح
                     video.srcObject.getTracks().forEach(track => track.stop());
+                    Quagga.stop();
                 } else {
                     requestAnimationFrame(scanQRCode);
                 }
             } else {
                 requestAnimationFrame(scanQRCode);
             }
+        }
+
+        function startBarcodeScanner() {
+            Quagga.init({
+                inputStream: {
+                    name: "Live",
+                    type: "LiveStream",
+                    target: video,
+                    constraints: {
+                        facingMode: "environment"
+                    }
+                },
+                decoder: {
+                    readers: ["code_128_reader", "ean_reader", "upc_reader"] // أنواع الباركود المدعومة
+                }
+            }, function (err) {
+                if (err) {
+                    console.error("⚠️ خطأ في تشغيل Quagga:", err);
+                    return;
+                }
+                Quagga.start();
+            });
+
+            Quagga.onDetected(function (result) {
+                if (result && result.codeResult && result.codeResult.code) {
+                    scanning = false;
+                    resultElement.innerText = `✅ تم المسح (باركود): ${result.codeResult.code}`;
+
+                    // إيقاف تشغيل الكاميرا بعد المسح
+                    video.srcObject.getTracks().forEach(track => track.stop());
+                    Quagga.stop();
+                }
+            });
         }
 
         startCamera();

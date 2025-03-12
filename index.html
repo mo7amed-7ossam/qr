@@ -22,21 +22,17 @@
         const resultElement = document.getElementById("result");
 
         let scanning = true;
+        let cameraStream = null;
 
         async function startCamera() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        facingMode: "environment",
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 }
-                    }
+                cameraStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } }
                 });
-                video.srcObject = stream;
-                video.setAttribute("playsinline", true);
+                video.srcObject = cameraStream;
                 video.play();
 
-                // بدء مسح QR وباركود
+                scanning = true;
                 requestAnimationFrame(scanQRCode);
                 startBarcodeScanner();
             } catch (err) {
@@ -45,24 +41,28 @@
             }
         }
 
+        function stopCamera() {
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => track.stop());
+            }
+            Quagga.stop();
+        }
+
         function scanQRCode() {
             if (!scanning) return;
 
             if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                canvas.width = video.videoWidth || 400;
-                canvas.height = video.videoHeight || 300;
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
                 let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                 let code = jsQR(imageData.data, imageData.width, imageData.height);
 
-                if (code && code.data.trim().length > 0) {
+                if (code?.data.trim()) {
                     scanning = false;
                     resultElement.innerText = `✅ تم المسح (QR): ${code.data}`;
-
-                    // إيقاف تشغيل الكاميرا بعد المسح
-                    video.srcObject.getTracks().forEach(track => track.stop());
-                    Quagga.stop();
+                    stopCamera();
                 } else {
                     requestAnimationFrame(scanQRCode);
                 }
@@ -74,50 +74,24 @@
         function startBarcodeScanner() {
             Quagga.init({
                 inputStream: {
-                    name: "Live",
                     type: "LiveStream",
                     target: video,
-                    constraints: {
-                        facingMode: "environment",
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 }
-                    }
+                    constraints: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } }
                 },
-                decoder: {
-                    readers: ["code_128_reader", "ean_reader", "upc_reader"],
-                    debug: {
-                        drawBoundingBox: true,
-                        showFrequency: true,
-                        drawScanline: true,
-                        showPattern: true
-                    }
-                },
-                locator: {
-                    halfSample: true,
-                    patchSize: "medium",
-                    debug: {
-                        showCanvas: true,
-                        showPatches: true,
-                        showFoundPatches: true,
-                        showSkeleton: true
-                    }
-                }
+                decoder: { readers: ["code_128_reader", "ean_reader", "upc_reader"] }
             }, function (err) {
                 if (err) {
-                    console.error("⚠️ خطأ في تشغيل Quagga:", err);
+                    console.error("⚠️ خطأ في Quagga:", err);
                     return;
                 }
                 Quagga.start();
             });
 
-            Quagga.onDetected(function (result) {
-                if (result && result.codeResult && result.codeResult.code) {
+            Quagga.onDetected(result => {
+                if (scanning && result?.codeResult?.code) {
                     scanning = false;
                     resultElement.innerText = `✅ تم المسح (باركود): ${result.codeResult.code}`;
-
-                    // إيقاف تشغيل الكاميرا بعد المسح
-                    video.srcObject.getTracks().forEach(track => track.stop());
-                    Quagga.stop();
+                    stopCamera();
                 }
             });
         }

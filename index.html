@@ -4,68 +4,64 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ماسح QR باستخدام الكاميرا</title>
-    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <title>قارئ QR و Barcode</title>
+    <script src="https://cdn.jsdelivr.net/npm/@zxing/browser@latest"></script>
 </head>
 
 <body>
-    <h2>امسح QR باستخدام الكاميرا</h2>
+    <h2>امسح QR أو Barcode باستخدام الكاميرا</h2>
     <video id="video" style="width: 100%; max-width: 400px;" autoplay playsinline></video>
-    <canvas id="canvas" style="display: none;"></canvas>
-    <p>النتيجة: <span id="result">لم يتم المسح بعد</span></p>
+    <p>📌 النتيجة: <span id="result">لم يتم المسح بعد</span></p>
+    <p id="error-message" style="color: red;"></p>
 
     <script>
-        const video = document.getElementById("video");
-        const canvas = document.getElementById("canvas");
-        const ctx = canvas.getContext("2d");
+        const videoElement = document.getElementById("video");
         const resultElement = document.getElementById("result");
-
-        let scanning = true;
+        const errorElement = document.getElementById("error-message");
+        const codeReader = new ZXing.BrowserMultiFormatReader();
 
         async function startCamera() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({
+                // ✅ التحقق من دعم المتصفح للكاميرا
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    throw new Error("🚫 المتصفح لا يدعم الكاميرا!");
+                }
+
+                const constraints = {
                     video: {
-                        facingMode: "environment",
-                        width: { ideal: 1280 },
+                        facingMode: "environment",  // ✅ استخدام الكاميرا الخلفية
+                        width: { ideal: 1280 },  // ✅ جودة أعلى لتحسين القراءة
                         height: { ideal: 720 }
                     }
-                });
-                video.srcObject = stream;
-                video.setAttribute("playsinline", true);
-                video.play();
-                requestAnimationFrame(scanQRCode);
+                };
+
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                videoElement.srcObject = stream;
+                videoElement.setAttribute("playsinline", true);
+                videoElement.play();
+
+                scanCode();
             } catch (err) {
                 console.error("⚠️ خطأ في تشغيل الكاميرا:", err);
-                resultElement.innerText = "⚠️ لا يمكن تشغيل الكاميرا!";
+                errorElement.innerText = `⚠️ ${err.message}`;
             }
         }
 
-        function scanQRCode() {
-            if (!scanning) return;
+        function scanCode() {
+            codeReader.decodeFromVideoDevice(undefined, videoElement, (result, err) => {
+                if (result) {
+                    resultElement.innerText = `✅ تم المسح: ${result.text}`;
 
-            if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                canvas.width = video.videoWidth || 400;
-                canvas.height = video.videoHeight || 300;
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    // ✅ إيقاف الكاميرا بعد العثور على الكود
+                    videoElement.srcObject.getTracks().forEach(track => track.stop());
 
-                let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                let code = jsQR(imageData.data, imageData.width, imageData.height);
-
-                if (code && code.data.trim().length > 0) {
-                    scanning = false;
-                    resultElement.innerText = `✅ تم المسح: ${code.data}`;
-
-                    // إيقاف تشغيل الكاميرا بعد المسح
-                    video.srcObject.getTracks().forEach(track => track.stop());
-                } else {
-                    requestAnimationFrame(scanQRCode);
+                } else if (err) {
+                    console.warn("⏳ لم يتم العثور على كود بعد...");
                 }
-            } else {
-                requestAnimationFrame(scanQRCode);
-            }
+            });
         }
 
+        // ✅ تشغيل الكاميرا عند تحميل الصفحة
         startCamera();
     </script>
 </body>

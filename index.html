@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>قارئ QR و Barcode</title>
-    <script src="https://cdn.jsdelivr.net/npm/@zxing/browser@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@zxing/library@latest"></script>
 </head>
 
 <body>
@@ -20,8 +20,8 @@
         const resultElement = document.getElementById("result");
         const errorElement = document.getElementById("error-message");
         const stopBtn = document.getElementById("stop-btn");
-        let stream; // لحفظ الكاميرا والتحكم فيها
-        let isScanning = true; // علشان الكاميرا تفضل شغالة لحد ما المستخدم يوقفها
+        let stream;
+        let isScanning = true;
 
         const codeReader = new ZXing.BrowserMultiFormatReader();
 
@@ -44,7 +44,7 @@
                 videoElement.setAttribute("playsinline", true);
                 videoElement.play();
 
-                stopBtn.style.display = "block"; // إظهار زر الإيقاف
+                stopBtn.style.display = "block";
                 scanCode();
             } catch (err) {
                 console.error("⚠️ خطأ في تشغيل الكاميرا:", err);
@@ -56,10 +56,10 @@
             codeReader.decodeFromVideoDevice(undefined, videoElement, (result, err) => {
                 if (result && isScanning) {
                     resultElement.innerText = `✅ تم المسح: ${result.text}`;
-                    isScanning = false; // منع تكرار القراءة
+                    isScanning = false;
 
                     setTimeout(() => {
-                        isScanning = true; // السماح بالمسح مرة أخرى بعد ثانيتين
+                        isScanning = true;
                     }, 2000);
                 }
             });

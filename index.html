@@ -4,74 +4,67 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>قارئ QR و Barcode</title>
-    <script src="https://cdn.jsdelivr.net/npm/@zxing/library@latest"></script>
+    <title>ماسح QR باستخدام الكاميرا</title>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 </head>
 
 <body>
-    <h2>امسح QR أو Barcode باستخدام الكاميرا</h2>
+    <h2>امسح QR باستخدام الكاميرا</h2>
     <video id="video" style="width: 100%; max-width: 400px;" autoplay playsinline></video>
-    <p>📌 النتيجة: <span id="result">لم يتم المسح بعد</span></p>
-    <p id="error-message" style="color: red;"></p>
-    <button id="stop-btn" style="display:none;">📴 إيقاف الكاميرا</button>
+    <canvas id="canvas" style="display: none;"></canvas>
+    <p>النتيجة: <span id="result">لم يتم المسح بعد</span></p>
 
     <script>
-        const videoElement = document.getElementById("video");
+        const video = document.getElementById("video");
+        const canvas = document.getElementById("canvas");
+        const ctx = canvas.getContext("2d");
         const resultElement = document.getElementById("result");
-        const errorElement = document.getElementById("error-message");
-        const stopBtn = document.getElementById("stop-btn");
-        let stream;
-        let isScanning = true;
 
-        const codeReader = new ZXing.BrowserMultiFormatReader();
+        let scanning = true;
 
         async function startCamera() {
             try {
-                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                    throw new Error("🚫 المتصفح لا يدعم الكاميرا!");
-                }
-
-                const constraints = {
+                const stream = await navigator.mediaDevices.getUserMedia({
                     video: {
                         facingMode: "environment",
                         width: { ideal: 1280 },
                         height: { ideal: 720 }
                     }
-                };
-
-                stream = await navigator.mediaDevices.getUserMedia(constraints);
-                videoElement.srcObject = stream;
-                videoElement.setAttribute("playsinline", true);
-                videoElement.play();
-
-                stopBtn.style.display = "block";
-                scanCode();
+                });
+                video.srcObject = stream;
+                video.setAttribute("playsinline", true);
+                video.play();
+                requestAnimationFrame(scanQRCode);
             } catch (err) {
                 console.error("⚠️ خطأ في تشغيل الكاميرا:", err);
-                errorElement.innerText = `⚠️ ${err.message}`;
+                resultElement.innerText = "⚠️ لا يمكن تشغيل الكاميرا!";
             }
         }
 
-        function scanCode() {
-            codeReader.decodeFromVideoDevice(undefined, videoElement, (result, err) => {
-                if (result && isScanning) {
-                    resultElement.innerText = `✅ تم المسح: ${result.text}`;
-                    isScanning = false;
+        function scanQRCode() {
+            if (!scanning) return;
 
-                    setTimeout(() => {
-                        isScanning = true;
-                    }, 2000);
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                canvas.width = video.videoWidth || 400;
+                canvas.height = video.videoHeight || 300;
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                let code = jsQR(imageData.data, imageData.width, imageData.height);
+
+                if (code && code.data.trim().length > 0) {
+                    scanning = false;
+                    resultElement.innerText = `✅ تم المسح: ${code.data}`;
+
+                    // إيقاف تشغيل الكاميرا بعد المسح
+                    video.srcObject.getTracks().forEach(track => track.stop());
+                } else {
+                    requestAnimationFrame(scanQRCode);
                 }
-            });
-        }
-
-        stopBtn.addEventListener("click", () => {
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-                videoElement.srcObject = null;
-                stopBtn.style.display = "none";
+            } else {
+                requestAnimationFrame(scanQRCode);
             }
-        });
+        }
 
         startCamera();
     </script>

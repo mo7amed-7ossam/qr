@@ -10,7 +10,7 @@
 
 <body>
     <h2>امسح QR باستخدام الكاميرا</h2>
-    <video id="video" width="300" height="300" autoplay playsinline></video>
+    <video id="video" style="width: 100%; max-width: 400px;" autoplay playsinline></video>
     <canvas id="canvas" style="display: none;"></canvas>
     <p>النتيجة: <span id="result">لم يتم المسح بعد</span></p>
 
@@ -22,39 +22,51 @@
 
         let scanning = true; // للتحكم في إيقاف المسح بعد العثور على QR
 
-        // تشغيل الكاميرا
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-            .then((stream) => {
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: "environment", // تشغيل الكاميرا الخلفية
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                });
                 video.srcObject = stream;
+                video.setAttribute("playsinline", true); // تحسين الأداء على iOS
                 video.play();
                 requestAnimationFrame(scanQRCode);
-            })
-            .catch((err) => {
+            } catch (err) {
                 console.error("⚠️ خطأ في تشغيل الكاميرا:", err);
                 resultElement.innerText = "⚠️ لا يمكن تشغيل الكاميرا!";
-            });
+            }
+        }
 
         function scanQRCode() {
             if (!scanning) return;
 
-            // ضبط أبعاد الـ canvas بما يناسب الفيديو
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                canvas.width = video.videoWidth || 400;
+                canvas.height = video.videoHeight || 300;
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-            let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            let code = jsQR(imageData.data, imageData.width, imageData.height);
+                let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                let code = jsQR(imageData.data, imageData.width, imageData.height);
 
-            if (code) {
-                scanning = false; // إيقاف المسح فور العثور على QR
-                resultElement.innerText = `✅ تم المسح: ${code.data}`;
+                if (code) {
+                    scanning = false;
+                    resultElement.innerText = `✅ تم المسح: ${code.data}`;
 
-                // إيقاف تشغيل الكاميرا بعد المسح
-                video.srcObject.getTracks().forEach(track => track.stop());
+                    // إيقاف تشغيل الكاميرا بعد المسح
+                    video.srcObject.getTracks().forEach(track => track.stop());
+                } else {
+                    requestAnimationFrame(scanQRCode);
+                }
             } else {
-                requestAnimationFrame(scanQRCode); // استمرار البحث حتى يتم العثور على QR
+                requestAnimationFrame(scanQRCode);
             }
         }
+
+        startCamera();
     </script>
 </body>
 

@@ -13,33 +13,38 @@
     <video id="video" style="width: 100%; max-width: 400px;" autoplay playsinline></video>
     <p>📌 النتيجة: <span id="result">لم يتم المسح بعد</span></p>
     <p id="error-message" style="color: red;"></p>
+    <button id="stop-btn" style="display:none;">📴 إيقاف الكاميرا</button>
 
     <script>
         const videoElement = document.getElementById("video");
         const resultElement = document.getElementById("result");
         const errorElement = document.getElementById("error-message");
+        const stopBtn = document.getElementById("stop-btn");
+        let stream; // لحفظ الكاميرا والتحكم فيها
+        let isScanning = true; // علشان الكاميرا تفضل شغالة لحد ما المستخدم يوقفها
+
         const codeReader = new ZXing.BrowserMultiFormatReader();
 
         async function startCamera() {
             try {
-                // ✅ التحقق من دعم المتصفح للكاميرا
                 if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                     throw new Error("🚫 المتصفح لا يدعم الكاميرا!");
                 }
 
                 const constraints = {
                     video: {
-                        facingMode: "environment",  // ✅ استخدام الكاميرا الخلفية
-                        width: { ideal: 1280 },  // ✅ جودة أعلى لتحسين القراءة
+                        facingMode: "environment",
+                        width: { ideal: 1280 },
                         height: { ideal: 720 }
                     }
                 };
 
-                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
                 videoElement.srcObject = stream;
                 videoElement.setAttribute("playsinline", true);
                 videoElement.play();
 
+                stopBtn.style.display = "block"; // إظهار زر الإيقاف
                 scanCode();
             } catch (err) {
                 console.error("⚠️ خطأ في تشغيل الكاميرا:", err);
@@ -49,19 +54,25 @@
 
         function scanCode() {
             codeReader.decodeFromVideoDevice(undefined, videoElement, (result, err) => {
-                if (result) {
+                if (result && isScanning) {
                     resultElement.innerText = `✅ تم المسح: ${result.text}`;
+                    isScanning = false; // منع تكرار القراءة
 
-                    // ✅ إيقاف الكاميرا بعد العثور على الكود
-                    videoElement.srcObject.getTracks().forEach(track => track.stop());
-
-                } else if (err) {
-                    console.warn("⏳ لم يتم العثور على كود بعد...");
+                    setTimeout(() => {
+                        isScanning = true; // السماح بالمسح مرة أخرى بعد ثانيتين
+                    }, 2000);
                 }
             });
         }
 
-        // ✅ تشغيل الكاميرا عند تحميل الصفحة
+        stopBtn.addEventListener("click", () => {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                videoElement.srcObject = null;
+                stopBtn.style.display = "none";
+            }
+        });
+
         startCamera();
     </script>
 </body>

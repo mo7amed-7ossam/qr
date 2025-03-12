@@ -20,19 +20,19 @@
         const ctx = canvas.getContext("2d");
         const resultElement = document.getElementById("result");
 
-        let scanning = true; // للتحكم في إيقاف المسح بعد العثور على QR
+        let scanning = true;
 
         async function startCamera() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: {
-                        facingMode: "environment", // تشغيل الكاميرا الخلفية
+                        facingMode: "environment",
                         width: { ideal: 1280 },
                         height: { ideal: 720 }
                     }
                 });
                 video.srcObject = stream;
-                video.setAttribute("playsinline", true); // تحسين الأداء على iOS
+                video.setAttribute("playsinline", true);
                 video.play();
                 requestAnimationFrame(scanQRCode);
             } catch (err) {
@@ -52,7 +52,7 @@
                 let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                 let code = jsQR(imageData.data, imageData.width, imageData.height);
 
-                if (code) {
+                if (code && code.data.trim().length > 0) {
                     scanning = false;
                     resultElement.innerText = `✅ تم المسح: ${code.data}`;
 
